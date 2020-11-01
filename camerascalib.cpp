@@ -30,6 +30,9 @@
 #include <string>
 #include <sstream>
 #include <chrono>
+#include <atomic>
+#include <signal.h>
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/videoio/videoio.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -39,8 +42,8 @@
 
 static std::string matches_window = "Matches";
 static std::string warping_window = "Warping";
-static int window_width = 1920;
-static int window_height = 1080;
+static int window_width = 1280;
+static int window_height = 720;
 
 static std::string create_capture (int camera, int width, int height, int fps);
 
@@ -66,10 +69,16 @@ static std::string create_capture (int camera, int width, int height, int fps)
         << " ! video/x-raw(memory:NVMM), width=(int)" << std::to_string(width) 
         << ", height=(int)" << std::to_string(height)
         << ", format=(string)NV12, framerate=(fraction)" << std::to_string(fps)
-        << "/1 ! nvvidconv ! video/x-raw, format=(string)I420 ! videoconvert"
+        << "/1 ! nvvidconv ! video/x-raw, format=(string)BGRx ! videoconvert"
         " ! video/x-raw, format=(string)BGR ! appsink ";
 
     return pipeline_str.str();
+}
+
+std::atomic<bool> g_stop;
+void signal_callback_handler(int signum) 
+{
+   g_stop = true; 
 }
 
 int main(int argc, char const *argv[])
@@ -150,10 +159,12 @@ int main(int argc, char const *argv[])
     cv::resizeWindow(matches_window, window_width, window_height);
     cv::resizeWindow(warping_window, window_width, window_height);
 
-    cv::moveWindow(matches_window, 0, 0); 
-    cv::moveWindow(warping_window, window_width, 0); 
+    cv::moveWindow(matches_window, 200, 100); 
+    cv::moveWindow(warping_window, window_width + 250, 100); 
 
-    while (true)
+    g_stop = false;
+    signal(SIGINT, signal_callback_handler);
+    while (!g_stop)
     {
         ticks.start();
         capture0 >> images[0];
@@ -164,10 +175,8 @@ int main(int argc, char const *argv[])
 
         calib->Feed(cuda_images); 
         calib->DrawMatches(images, matches_image); 
-        // calib->Estimate(); 
         calib->Evaluate(cuda_images, psnr, mssim, stitched_image); 
         stitched_image.download(visual_stitching); 
-
         cv::imshow(matches_window, matches_image);
         cv::imshow(warping_window, visual_stitching);
         int key = cv::waitKey(1);
@@ -181,6 +190,9 @@ int main(int argc, char const *argv[])
         }
         else if (key == 's') {
             calib->Save(); 
+        }
+        else if (key == 'r') {
+            calib->Reset(); 
         }
         ticks.stop();
     }
