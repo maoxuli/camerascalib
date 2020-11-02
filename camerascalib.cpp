@@ -54,6 +54,7 @@ static void help()
     "./opencv_nvgstcam [--Options]\n\n"
     "OPTIONS:\n"
     "\t-h,--help            Prints this message\n"
+    "\t--file               Calib file [Default = cameras.xml]\n"
     "\t--width              Capture width [Default = 1280]\n"
     "\t--height             Capture height [Default = 720]\n"
     "\t--fps                Frames per second [Default = 30]\n"
@@ -83,6 +84,7 @@ void signal_callback_handler(int signum)
 
 int main(int argc, char const *argv[])
 {
+    std::string calib_file; 
     int width;
     int height;
     unsigned int fps;
@@ -103,11 +105,11 @@ int main(int argc, char const *argv[])
     cv::Scalar mssim; 
 
     const std::string keys =
-    "{h help         |     | message }"
-    "{width          |1920 | width }"
-    "{height         |1080 | height }"
-    "{fps            |30   | frame per second }"
-    ;
+    "{h help         |              | message }"
+    "{file           |cameras.xml   | file }"
+    "{width          |1920          | width }"
+    "{height         |1080          | height }"
+    "{fps            |30            | frame per second }";
 
     cv::CommandLineParser cmd_parser(argc, argv, keys);
 
@@ -117,6 +119,7 @@ int main(int argc, char const *argv[])
         goto cleanup;
     }
 
+    calib_file = cmd_parser.get<std::string>("file"); 
     width = cmd_parser.get<int>("width");
     height = cmd_parser.get<int>("height");
     fps = cmd_parser.get<unsigned int>("fps");
@@ -145,7 +148,9 @@ int main(int argc, char const *argv[])
         goto cleanup;
     }
 
-    calib_settings.image_size = cv::Size(width, height); 
+    calib_settings.calib_file = calib_file; 
+    calib_settings.image_size = cv::Size(width, height);
+    calib_settings.match_mode = 0; 
     calib.reset(new videostitcher::CamerasCalib(calib_settings));
     if (!calib) {
         std::cerr << "Failed to start calibrator" << std::endl;
@@ -174,7 +179,7 @@ int main(int argc, char const *argv[])
         cuda_images[1].upload(images[1]);
 
         calib->Feed(cuda_images); 
-        calib->DrawMatches(images, matches_image); 
+        calib->Matches(images, matches_image); 
         calib->Evaluate(cuda_images, psnr, mssim, stitched_image); 
         stitched_image.download(visual_stitching); 
         cv::imshow(matches_window, matches_image);
