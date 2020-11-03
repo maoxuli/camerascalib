@@ -72,6 +72,8 @@ LDFLAGS += \
 
 LDFLAGS += -L/usr/local/lib -Wl,-rpath,/usr/local/lib -lvideostitcher
 
+APP_INSTALL_DIR ?= /usr/local/bin
+
 APP := camerascalib
 
 SRCS := camerascalib.cpp
@@ -87,6 +89,9 @@ all: $(APP)
 $(APP): $(OBJS)
 	@echo "Linking: $@"
 	$(CPP) -o $@ $(OBJS) $(CPPFLAGS) $(LDFLAGS)
+
+install: $(APP)
+	cp -rv $(APP) $(APP_INSTALL_DIR)
 
 clean:
 	$(AT)rm -rf $(APP) $(OBJS)
